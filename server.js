@@ -1,46 +1,54 @@
 const express = require('express');
+const cors = require('cors');
 const fs = require('fs');
+
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
-const FILE_PATH = 'leaderboard.json';
-
+// ✅ Enable CORS for all requests
+app.use(cors());
 app.use(express.json());
 
-// Function to load leaderboard data
+const leaderboardFile = 'leaderboard.json';
+
+// Load existing leaderboard
 function loadLeaderboard() {
-    if (fs.existsSync(FILE_PATH)) {
-        return JSON.parse(fs.readFileSync(FILE_PATH));
+    try {
+        const data = fs.readFileSync(leaderboardFile, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Error loading leaderboard:', error);
+        return [];
     }
-    return [];
 }
 
-// Function to save leaderboard data
+// Save leaderboard data
 function saveLeaderboard(leaderboard) {
-    fs.writeFileSync(FILE_PATH, JSON.stringify(leaderboard, null, 2));
+    fs.writeFileSync(leaderboardFile, JSON.stringify(leaderboard, null, 2));
 }
 
-// API to update leaderboard
+// ✅ Handle GET request for leaderboard
+app.get('/leaderboard', (req, res) => {
+    const leaderboard = loadLeaderboard();
+    res.json(leaderboard.sort((a, b) => b.score - a.score)); // Ensure descending order
+});
+
+// ✅ Handle POST request to update leaderboard
 app.post('/update_leaderboard', (req, res) => {
     const { name, score } = req.body;
+    
+    if (!name || isNaN(score)) {
+        return res.status(400).json({ error: "Invalid data format" });
+    }
 
     let leaderboard = loadLeaderboard();
-
-    // Add new entry
     leaderboard.push({ name, score });
-
-    // Sort leaderboard by highest score
-    leaderboard.sort((a, b) => b.score - a.score);
-
-    // Save to file
     saveLeaderboard(leaderboard);
 
-    res.json({ message: "Leaderboard updated!" });
+    res.json({ message: "Leaderboard updated successfully!" });
 });
 
-// API to fetch leaderboard
-app.get('/leaderboard', (req, res) => {
-    res.json(loadLeaderboard());
+// Start the server
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
-
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
